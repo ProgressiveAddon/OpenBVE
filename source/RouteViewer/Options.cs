@@ -166,6 +166,7 @@ namespace RouteViewer
 							break;
 					}
 				}
+				Interface.CurrentOptions.IsUseNewRenderer = true;
 			}
 		}
 	}

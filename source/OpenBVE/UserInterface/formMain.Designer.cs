@@ -227,7 +227,6 @@ namespace OpenBve {
             this.checkBoxUnloadTextures = new System.Windows.Forms.CheckBox();
             this.labelTimeAcceleration = new System.Windows.Forms.Label();
             this.updownTimeAccelerationFactor = new System.Windows.Forms.NumericUpDown();
-            this.checkBoxIsUseNewRenderer = new System.Windows.Forms.CheckBox();
             this.checkBoxLoadInAdvance = new System.Windows.Forms.CheckBox();
             this.groupBoxPackageOptions = new System.Windows.Forms.GroupBox();
             this.buttonMSTSTrainsetDirectory = new System.Windows.Forms.Button();
@@ -3156,7 +3155,6 @@ namespace OpenBve {
             this.groupBoxAdvancedOptions.Controls.Add(this.checkBoxUnloadTextures);
             this.groupBoxAdvancedOptions.Controls.Add(this.labelTimeAcceleration);
             this.groupBoxAdvancedOptions.Controls.Add(this.updownTimeAccelerationFactor);
-            this.groupBoxAdvancedOptions.Controls.Add(this.checkBoxIsUseNewRenderer);
             this.groupBoxAdvancedOptions.Controls.Add(this.checkBoxLoadInAdvance);
             this.groupBoxAdvancedOptions.ForeColor = System.Drawing.Color.Black;
             this.groupBoxAdvancedOptions.Location = new System.Drawing.Point(0, 323);
@@ -3257,17 +3255,7 @@ namespace OpenBve {
             this.updownTimeAccelerationFactor.TabIndex = 16;
             this.updownTimeAccelerationFactor.ValueChanged += new System.EventHandler(this.updownTimeAccelerationFactor_ValueChanged);
             // 
-            // checkBoxIsUseNewRenderer
-            // 
-            this.checkBoxIsUseNewRenderer.AutoSize = true;
-            this.checkBoxIsUseNewRenderer.Location = new System.Drawing.Point(8, 43);
-            this.checkBoxIsUseNewRenderer.Name = "checkBoxIsUseNewRenderer";
-            this.checkBoxIsUseNewRenderer.Size = new System.Drawing.Size(159, 17);
-            this.checkBoxIsUseNewRenderer.TabIndex = 2;
-            this.checkBoxIsUseNewRenderer.Text = "Disable OpenGL display lists";
-            this.checkBoxIsUseNewRenderer.UseVisualStyleBackColor = true;
-            // 
-            // checkBoxLoadInAdvance
+
             // 
             this.checkBoxLoadInAdvance.AutoSize = true;
             this.checkBoxLoadInAdvance.Location = new System.Drawing.Point(8, 24);
@@ -6983,7 +6971,6 @@ namespace OpenBve {
 		private System.Windows.Forms.Label labelCursor;
         private System.Windows.Forms.ComboBox comboboxCursor;
 		private System.Windows.Forms.CheckBox checkBoxPanel2Extended;
-		private System.Windows.Forms.CheckBox checkBoxIsUseNewRenderer;
 		private System.Windows.Forms.CheckBox checkBoxLoadInAdvance;
 		private System.Windows.Forms.GroupBox groupBoxRailDriver;
 		private System.Windows.Forms.Label labelRailDriverCalibration;

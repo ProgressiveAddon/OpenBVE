@@ -851,8 +851,7 @@ namespace OpenBve
 						Interface.CurrentOptions.ShowEvents = !Interface.CurrentOptions.ShowEvents;
 						break;
 					case Translations.Command.DebugRendererMode:
-						Interface.CurrentOptions.IsUseNewRenderer = !Interface.CurrentOptions.IsUseNewRenderer;
-						MessageManager.AddMessage($"Renderer mode: {(Program.Renderer.AvailableNewRenderer ? "New renderer" : "Original renderer")}", MessageDependency.None, GameMode.Expert, MessageColor.White, 10, null);
+						MessageManager.AddMessage("Renderer mode: New renderer", MessageDependency.None, GameMode.Expert, MessageColor.White, 10, null);
 						break;
 					case Translations.Command.MiscAI:
 						// option: AI

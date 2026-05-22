@@ -232,11 +232,7 @@ namespace LibRender2
 		/// <summary>Holds the handle of the last VAO bound by openGL</summary>
 		public int lastVAO;
 
-		public bool ForceLegacyOpenGL
-		{
-			get;
-			set;
-		}
+		public bool ForceLegacyOpenGL => false;
 
 		protected internal Texture _programLogo;
 
@@ -310,7 +306,7 @@ namespace LibRender2
 
 		public Dictionary<Texture, HashSet<Vector3>> CubesToDraw = new Dictionary<Texture, HashSet<Vector3>>();
 
-		public bool AvailableNewRenderer => currentOptions != null && currentOptions.IsUseNewRenderer && !ForceLegacyOpenGL;
+		public bool AvailableNewRenderer => true;
 
 		protected BaseRenderer(HostInterface CurrentHost, BaseOptions CurrentOptions, FileSystem FileSystem)
 		{
@@ -345,56 +341,30 @@ namespace LibRender2
 		[HandleProcessCorruptedStateExceptions] //As some graphics cards crash really nastily if we request unsupported features
 		public virtual void Initialize()
 		{
-			if (!ForceLegacyOpenGL && (currentOptions.IsUseNewRenderer || currentHost.Application != HostApplication.OpenBve)) // GL3 has already failed. Don't trigger unnecessary exceptions
+			try
 			{
-				try
-				{
-					if (DefaultShader == null)
-					{
-						DefaultShader = new Shader(this, "default", "default", true);
-					}
-					DefaultShader.Activate();
-					DefaultShader.SetMaterialAmbient(Color32.White);
-					DefaultShader.SetMaterialDiffuse(Color32.White);
-					DefaultShader.SetMaterialSpecular(Color32.White);
-					lastColor = Color32.White;
-					DefaultShader.Deactivate();
-					dummyVao = new VertexArrayObject();
-				}
-				catch
-				{
-					currentHost.AddMessage(MessageType.Error, false, "Initializing the default shaders failed- Falling back to legacy openGL.");
-					currentOptions.IsUseNewRenderer = false;
-					ForceLegacyOpenGL = true;
-					GL.GetError();
-					try
-					{
-						/*
-						 * Nasty little edge case with some Intel graphics- They create the shader OK
-						 * but it crashes on use, but remains active
-						 * Deactivate it, otherwise we get a grey screen
-						 */
-						DefaultShader?.Deactivate();
-					}
-					catch 
-					{ 
-						// ignored
-						GL.GetError();
-					}
-					
-				}
-
 				if (DefaultShader == null)
 				{
-					// Shader failed to load, but no exception
-					currentHost.AddMessage(MessageType.Error, false, "Initializing the default shaders failed- Falling back to legacy openGL.");
-					currentOptions.IsUseNewRenderer = false;
-					ForceLegacyOpenGL = true;
+					DefaultShader = new Shader(this, "default", "default", true);
 				}
+				DefaultShader.Activate();
+				DefaultShader.SetMaterialAmbient(Color32.White);
+				DefaultShader.SetMaterialDiffuse(Color32.White);
+				DefaultShader.SetMaterialSpecular(Color32.White);
+				lastColor = Color32.White;
+				DefaultShader.Deactivate();
+				dummyVao = new VertexArrayObject();
 			}
-			else
+			catch (Exception ex)
 			{
-				ForceLegacyOpenGL = true;
+				currentHost.AddMessage(MessageType.Error, false, "Initializing the default shaders failed. OpenBVE requires OpenGL 4.1+: " + ex.Message);
+				throw;
+			}
+
+			if (DefaultShader == null)
+			{
+				currentHost.AddMessage(MessageType.Error, false, "Initializing the default shaders failed. OpenBVE requires OpenGL 4.1+.");
+				throw new Exception("Default shader failed to load");
 			}
 
 			Background = new Background(this);
@@ -410,18 +380,14 @@ namespace LibRender2
 
 			StaticObjectStates = new List<ObjectState>();
 			DynamicObjectStates = new List<ObjectState>();
-			VisibleObjects = new VisibleObjectLibrary(this);
 			whitePixel = new Texture(new Texture(1, 1, PixelFormat.RGBAlpha, new byte[] {255, 255, 255, 255}, null));
-			if (AvailableNewRenderer)
-			{
-				nullDepthMap = GL.GenTexture();
-				GL.BindTexture(TextureTarget.Texture2D, nullDepthMap);
-				GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent16, 1, 1, 0, OpenTK.Graphics.OpenGL.PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
-				GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
-				GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-				GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-				GL.BindTexture(TextureTarget.Texture2D, 0);
-			}
+			nullDepthMap = GL.GenTexture();
+			GL.BindTexture(TextureTarget.Texture2D, nullDepthMap);
+			GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent16, 1, 1, 0, OpenTK.Graphics.OpenGL.PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+			GL.BindTexture(TextureTarget.Texture2D, 0);
 			GL.ClearColor(currentOptions.ClearColor.R * inv255, currentOptions.ClearColor.G * inv255, currentOptions.ClearColor.B * inv255, 1.0f);
 			GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 			GL.Enable(EnableCap.DepthTest);
@@ -444,12 +410,6 @@ namespace LibRender2
 			GL.CullFace(CullFaceMode.Front);
 			GL.Disable(EnableCap.Dither);
 			
-			if (!AvailableNewRenderer)
-			{
-				GL.Disable(EnableCap.Texture2D);
-				GL.Fog(FogParameter.FogMode, (int)FogMode.Linear);
-			}
-			
 			// ReSharper disable once PossibleNullReferenceException
 			string openGLdll = Path.CombineFile(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "opengl32.dll");
 
@@ -471,10 +431,7 @@ namespace LibRender2
 
 			Lighting.Initialize();
 
-			if (AvailableNewRenderer)
-			{
-				Shadows.Initialize();
-			}
+			Shadows.Initialize();
 		}
 
 		/// <summary>Initializes (or reinitializes) shadow mapping from current options.</summary>
@@ -511,16 +468,7 @@ namespace LibRender2
 		/// <remarks>We need to purge the current shader state and update lighting to avoid glitches</remarks>
 		public void SwitchOpenGLVersion()
 		{
-			GL.UseProgram(0);
-			currentOptions.IsUseNewRenderer = !currentOptions.IsUseNewRenderer;
-			ResetOpenGlState();
-			Lighting.Initialize();
-			if (currentOptions.IsUseNewRenderer && AvailableNewRenderer)
-			{
-				ReloadShadowSettings();
-			}
-			// Drain errors to ensure the shader reset in the next frame doesn't pick up legacy errors
-			while (GL.GetError() != ErrorCode.NoError) { }
+			// Deprecated - OpenGL 4.1 is now required.
 		}
 
 		/// <summary>Performs the CSM shadow depth rendering pass for all geometry.</summary>
@@ -580,12 +528,6 @@ namespace LibRender2
 		{
 			GL.Enable(EnableCap.CullFace);
 			GL.CullFace(CullFaceMode.Front);
-			if (!AvailableNewRenderer)
-			{
-				GL.Disable(EnableCap.Lighting);
-				GL.Disable(EnableCap.Fog);
-				GL.Disable(EnableCap.Texture2D);
-			}
 			
 			SetBlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 			UnsetBlendFunc();
@@ -772,24 +714,21 @@ namespace LibRender2
 		/// the required VAO objects</remarks>
 		public void InitializeVisibility()
 		{
-			if (!ForceLegacyOpenGL) // as we might want to switch renderer types
+			for (int i = 0; i < StaticObjectStates.Count; i++)
 			{
-				for (int i = 0; i < StaticObjectStates.Count; i++)
-				{
-					VAOExtensions.CreateVAO(StaticObjectStates[i].Prototype.Mesh, false, DefaultShader.VertexLayout, this);
-					/*
-					 * n.b.
-					 * Only create the actual matrix buffer at first frame render time
-					 * I can't find why at the minute, but Object Viewer otherwise doesn't show them, and attempting
-					 * to retrieve previously set matricies from the shader shows all zeros
-					 *
-					 * Probably a timing issue, but it works doing it that way :/
-					 */
-				}
-				for (int i = 0; i < DynamicObjectStates.Count; i++)
-				{
-					VAOExtensions.CreateVAO(DynamicObjectStates[i].Prototype.Mesh, false, DefaultShader.VertexLayout, this);
-				}
+				VAOExtensions.CreateVAO(StaticObjectStates[i].Prototype.Mesh, false, DefaultShader.VertexLayout, this);
+				/*
+				 * n.b.
+				 * Only create the actual matrix buffer at first frame render time
+				 * I can't find why at the minute, but Object Viewer otherwise doesn't show them, and attempting
+				 * to retrieve previously set matricies from the shader shows all zeros
+				 *
+				 * Probably a timing issue, but it works doing it that way :/
+				 */
+			}
+			for (int i = 0; i < DynamicObjectStates.Count; i++)
+			{
+				VAOExtensions.CreateVAO(DynamicObjectStates[i].Prototype.Mesh, false, DefaultShader.VertexLayout, this);
 			}
 			ObjectsSortedByStart = StaticObjectStates.Select((x, i) => new { Index = i, Distance = x.StartingDistance }).OrderBy(x => x.Distance).Select(x => x.Index).ToArray();
 			ObjectsSortedByEnd = StaticObjectStates.Select((x, i) => new { Index = i, Distance = x.EndingDistance }).OrderBy(x => x.Distance).Select(x => x.Index).ToArray();
@@ -1219,32 +1158,15 @@ namespace LibRender2
 			alphaTestEnabled = true;
 			alphaFuncComparison = comparison;
 			alphaFuncValue = value;
-			if (AvailableNewRenderer)
-			{
-				CurrentShader.SetAlphaTest(true);
-				CurrentShader.SetAlphaFunction(comparison, value);
-			}
-			else
-			{
-				GL.Enable(EnableCap.AlphaTest);
-				GL.AlphaFunc(comparison, value);	
-			}
-			
+			CurrentShader.SetAlphaTest(true);
+			CurrentShader.SetAlphaFunction(comparison, value);
 		}
 
 		/// <summary>Disables OpenGL alpha testing</summary>
 		public void UnsetAlphaFunc()
 		{
 			alphaTestEnabled = false;
-			if (AvailableNewRenderer)
-			{
-				CurrentShader.SetAlphaTest(false);
-			}
-			else
-			{
-				GL.Disable(EnableCap.AlphaTest);	
-			}
-			
+			CurrentShader.SetAlphaTest(false);
 		}
 
 		/// <summary>Restores the OpenGL alpha function to it's previous state</summary>
@@ -1252,28 +1174,12 @@ namespace LibRender2
 		{
 			if (alphaTestEnabled)
 			{
-				if (AvailableNewRenderer)
-				{
-					CurrentShader.SetAlphaTest(true);
-					CurrentShader.SetAlphaFunction(alphaFuncComparison, alphaFuncValue);
-				}
-				else
-				{
-					GL.Enable(EnableCap.AlphaTest);
-					GL.AlphaFunc(alphaFuncComparison, alphaFuncValue);
-				}
-				
+				CurrentShader.SetAlphaTest(true);
+				CurrentShader.SetAlphaFunction(alphaFuncComparison, alphaFuncValue);
 			}
 			else
 			{
-				if (AvailableNewRenderer)
-				{
-					CurrentShader.SetAlphaTest(false);
-				}
-				else
-				{
-					GL.Disable(EnableCap.AlphaTest);
-				}
+				CurrentShader.SetAlphaTest(false);
 			}
 		}
 

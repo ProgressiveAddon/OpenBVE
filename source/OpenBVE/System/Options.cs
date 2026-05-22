@@ -664,6 +664,7 @@ namespace OpenBve
 							break;
 					}
 				}
+				CurrentOptions.IsUseNewRenderer = true;
 			}
 		}
 		

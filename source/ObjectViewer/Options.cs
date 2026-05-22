@@ -216,6 +216,7 @@ namespace ObjectViewer
 
 					}
 				}
+				Interface.CurrentOptions.IsUseNewRenderer = true;
 			}
 		}
 	}
