@@ -12,9 +12,8 @@ namespace ObjectViewer
 {
     internal class ObjectViewer : GameWindow
     {
-        //Deliberately specify the default constructor with various overrides
         public ObjectViewer(int width, int height, GraphicsMode currentGraphicsMode, string windowTitle,
-            GameWindowFlags @default) : base(width, height, currentGraphicsMode, windowTitle, @default)
+            GameWindowFlags @default, GraphicsContextFlags flags) : base(width, height, currentGraphicsMode, windowTitle, @default, DisplayDevice.Default, 4, Program.CurrentHost.Platform == OpenBveApi.Hosts.HostPlatform.AppleOSX ? 1 : 3, flags)
         {
             try
             {

@@ -187,7 +187,9 @@ namespace RouteViewer
 				Renderer.Screen.Height = 768;
 			}
 			Renderer.CameraTrackFollower = new TrackFollower(Program.CurrentHost);
-			Renderer.GameWindow = new RouteViewer(Renderer.Screen.Width, Renderer.Screen.Height, Renderer.GraphicsMode, "Route Viewer", GameWindowFlags.Default);
+			GraphicsContextFlags flags = (Program.CurrentHost.Platform == HostPlatform.AppleOSX && IntPtr.Size != 4 || Interface.CurrentOptions.ForceForwardsCompatibleContext)
+				? GraphicsContextFlags.ForwardCompatible : GraphicsContextFlags.Default;
+			Renderer.GameWindow = new RouteViewer(Renderer.Screen.Width, Renderer.Screen.Height, Renderer.GraphicsMode, "Route Viewer", GameWindowFlags.Default, flags);
 			Renderer.GameWindow.Visible = true;
 			Renderer.GameWindow.TargetUpdateFrequency = 0;
 			Renderer.GameWindow.TargetRenderFrequency = 0;

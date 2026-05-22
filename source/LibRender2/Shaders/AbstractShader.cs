@@ -1,4 +1,4 @@
-﻿//Simplified BSD License (BSD-2-Clause)
+//Simplified BSD License (BSD-2-Clause)
 //
 //Copyright (c) 2024, Christopher Lees, S520, Aditiya Afrizal, The OpenBVE Project
 //
@@ -101,6 +101,10 @@ namespace LibRender2.Shaders
 		internal void LoadShader(string shaderSource, ShaderType shaderType)
 		{
 			int status;
+			if (Renderer.currentHost.Platform == OpenBveApi.Hosts.HostPlatform.AppleOSX)
+			{
+				shaderSource = shaderSource.Replace("#version 430 core", "#version 410 core");
+			}
 
 			switch (shaderType)
 			{
