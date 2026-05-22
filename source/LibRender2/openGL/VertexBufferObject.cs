@@ -1,5 +1,4 @@
 using System;
-using OpenTK;
 using OpenTK.Graphics.OpenGL;
 
 namespace LibRender2
@@ -91,25 +90,25 @@ namespace LibRender2
 			if (VertexLayout.Position >= 0)
 			{
 				GL.VertexAttribPointer(VertexLayout.Position, 3, VertexAttribPointerType.Float, false, vertexSize, offset);
-				offset += Vector3.SizeInBytes;
+				offset += sizeof(float) * 3;
 			}
 
 			if (VertexLayout.Normal >= 0)
 			{
 				GL.VertexAttribPointer(VertexLayout.Normal, 3, VertexAttribPointerType.Float, false, vertexSize, offset);
-				offset += Vector3.SizeInBytes;
+				offset += sizeof(float) * 3;
 			}
 
 			if (VertexLayout.UV >= 0)
 			{
 				GL.VertexAttribPointer(VertexLayout.UV, 2, VertexAttribPointerType.Float, false, vertexSize, offset);
-				offset += Vector2.SizeInBytes; //equivalent to API Vector2
+				offset += sizeof(float) * 2; //equivalent to API Vector2
 			}
 
 			if (VertexLayout.Color >= 0)
 			{
 				GL.VertexAttribPointer(VertexLayout.Color, 4, VertexAttribPointerType.Float, false, vertexSize, offset);
-				offset += Vector4.SizeInBytes;
+				offset += sizeof(float) * 4;
 			}
 
 			if (VertexLayout.MatrixChain >= 0)

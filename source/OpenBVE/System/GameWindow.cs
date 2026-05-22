@@ -34,7 +34,7 @@ using SoundManager;
 using TrainManager.Car;
 using TrainManager.Trains;
 using Path = System.IO.Path;
-using Vector2 = OpenTK.Vector2;
+using Vector2 = System.Numerics.Vector2;
 using Control = OpenBveApi.Interface.Control;
 using MouseCursor = LibRender2.MouseCursor;
 

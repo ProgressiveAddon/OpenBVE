@@ -27,7 +27,7 @@ using OpenBveApi.Colors;
 using OpenBveApi.Math;
 using OpenBveApi.Objects;
 using OpenBveApi.Textures;
-using OpenTK;
+using System.Numerics;
 using OpenTK.Graphics.OpenGL;
 using Vector2 = OpenBveApi.Math.Vector2;
 using Vector3 = OpenBveApi.Math.Vector3;
@@ -180,9 +180,9 @@ namespace LibRender2.Shaders
 		}
 
 
-		private Matrix4 ConvertToMatrix4(Matrix4D mat)
+		private Matrix4x4 ConvertToMatrix4(Matrix4D mat)
 		{
-			return new Matrix4(
+			return new Matrix4x4(
 				(float)mat.Row0.X, (float)mat.Row0.Y, (float)mat.Row0.Z, (float)mat.Row0.W,
 				(float)mat.Row1.X, (float)mat.Row1.Y, (float)mat.Row1.Z, (float)mat.Row1.W,
 				(float)mat.Row2.X, (float)mat.Row2.Y, (float)mat.Row2.Z, (float)mat.Row2.W,
@@ -199,8 +199,8 @@ namespace LibRender2.Shaders
 		public void SetCurrentProjectionMatrix(Matrix4D ProjectionMatrix)
 		{
 			Renderer.lastObjectState = null; // clear the cached object state, as otherwise it might be stale
-			Matrix4 matrix = ConvertToMatrix4(ProjectionMatrix);
-			GL.ProgramUniformMatrix4(Handle, UniformLayout.CurrentProjectionMatrix, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(ProjectionMatrix);
+			GL.ProgramUniformMatrix4(Handle, UniformLayout.CurrentProjectionMatrix, 1, false, ref matrix.M11);
 		}
 
 		/// <summary>
@@ -209,7 +209,7 @@ namespace LibRender2.Shaders
 		public void SetCurrentAnimationMatricies(ObjectState objectState)
 		{
 			Renderer.lastObjectState = null; // clear the cached object state, as otherwise it might be stale
-			Matrix4[] matriciesToShader = new Matrix4[objectState.Matricies.Length];
+			Matrix4x4[] matriciesToShader = new Matrix4x4[objectState.Matricies.Length];
 
 			for (int i = 0; i < objectState.Matricies.Length; i++)
 			{
@@ -224,7 +224,7 @@ namespace LibRender2.Shaders
 				}
 
 				GL.BindBuffer(BufferTarget.UniformBuffer, objectState.MatrixBufferIndex);
-				GL.BufferData(BufferTarget.UniformBuffer, sizeof(Matrix4) * matriciesToShader.Length, matriciesToShader, BufferUsageHint.StaticDraw);
+				GL.BufferData(BufferTarget.UniformBuffer, sizeof(Matrix4x4) * matriciesToShader.Length, matriciesToShader, BufferUsageHint.StaticDraw);
 			}
 
 		}
@@ -239,7 +239,7 @@ namespace LibRender2.Shaders
 		public void SetCurrentModelViewMatrix(Matrix4D ModelViewMatrix)
 		{
 			Renderer.lastObjectState = null; // clear the cached object state, as otherwise it might be stale
-			Matrix4 matrix = ConvertToMatrix4(ModelViewMatrix);
+			Matrix4x4 matrix = ConvertToMatrix4(ModelViewMatrix);
 
 			// When transpose is false, B is equal to the transposed matrix of A.
 			// B = transpose(A) = transpose(M * V) = transpose(V) * transpose(M)
@@ -260,7 +260,7 @@ namespace LibRender2.Shaders
 			// | m12 m22 m32 m42 |
 			// | m13 m23 m33 m43 |
 			// | m14 m24 m34 m44 |
-			GL.ProgramUniformMatrix4(Handle, UniformLayout.CurrentModelViewMatrix, false, ref matrix);
+			GL.ProgramUniformMatrix4(Handle, UniformLayout.CurrentModelViewMatrix, 1, false, ref matrix.M11);
 		}
 		
 		/// <summary>
@@ -269,8 +269,8 @@ namespace LibRender2.Shaders
 		/// <param name="TextureMatrix"></param>
 		public void SetCurrentTextureMatrix(Matrix4D TextureMatrix)
 		{
-			Matrix4 matrix = ConvertToMatrix4(TextureMatrix);
-			GL.ProgramUniformMatrix4(Handle, UniformLayout.CurrentTextureMatrix, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(TextureMatrix);
+			GL.ProgramUniformMatrix4(Handle, UniformLayout.CurrentTextureMatrix, 1, false, ref matrix.M11);
 		}
 
 		public void SetIsLight(bool IsLight)
@@ -444,8 +444,8 @@ namespace LibRender2.Shaders
 				case 3: loc = uLightSpaceMatrix3Location; break;
 				default: return;
 			}
-			Matrix4 OpenTKMatrix = ConvertToMatrix4(matrix);
-			GL.ProgramUniformMatrix4(Handle, loc, false, ref OpenTKMatrix);
+			Matrix4x4 OpenTKMatrix = ConvertToMatrix4(matrix);
+			GL.ProgramUniformMatrix4(Handle, loc, 1, false, ref OpenTKMatrix.M11);
 		}
 
 		public void SetCascadeShadowMapUnit(int cascade, int textureUnit)
@@ -516,14 +516,14 @@ namespace LibRender2.Shaders
 
 		public void SetCurrentViewMatrix(OpenBveApi.Math.Matrix4D viewMatrix)
 		{
-			Matrix4 matrix = ConvertToMatrix4(viewMatrix);
-			GL.ProgramUniformMatrix4(Handle, uCurrentViewMatrixLocation, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(viewMatrix);
+			GL.ProgramUniformMatrix4(Handle, uCurrentViewMatrixLocation, 1, false, ref matrix.M11);
 		}
 
 		public void SetCurrentModelMatrix(OpenBveApi.Math.Matrix4D modelMatrix)
 		{
-			Matrix4 matrix = ConvertToMatrix4(modelMatrix);
-			GL.ProgramUniformMatrix4(Handle, uModelMatrixLocation, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(modelMatrix);
+			GL.ProgramUniformMatrix4(Handle, uModelMatrixLocation, 1, false, ref matrix.M11);
 		}
 
 		private static float[] Matrix4DToFloatArray(OpenBveApi.Math.Matrix4D m)

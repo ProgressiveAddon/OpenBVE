@@ -23,6 +23,7 @@
 //SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using OpenBveApi.Objects;
+using System.Numerics;
 using OpenTK.Graphics.OpenGL;
 
 namespace LibRender2.Shaders
@@ -62,20 +63,20 @@ namespace LibRender2.Shaders
 
 		public void SetLightSpaceMatrix(OpenBveApi.Math.Matrix4D m)
 		{
-			OpenTK.Matrix4 matrix = ConvertToMatrix4(m);
-			GL.UniformMatrix4(uLightSpaceMatrix, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(m);
+			GL.UniformMatrix4(uLightSpaceMatrix, 1, false, ref matrix.M11);
 		}
 
 		public void SetModelMatrix(OpenBveApi.Math.Matrix4D m)
 		{
-			OpenTK.Matrix4 matrix = ConvertToMatrix4(m);
-			GL.UniformMatrix4(uModelMatrix, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(m);
+			GL.UniformMatrix4(uModelMatrix, 1, false, ref matrix.M11);
 		}
 
 		public void SetTextureMatrix(OpenBveApi.Math.Matrix4D m)
 		{
-			OpenTK.Matrix4 matrix = ConvertToMatrix4(m);
-			GL.UniformMatrix4(uTextureMatrix, false, ref matrix);
+			Matrix4x4 matrix = ConvertToMatrix4(m);
+			GL.UniformMatrix4(uTextureMatrix, 1, false, ref matrix.M11);
 		}
 
 		public void SetTexture(int unit)
@@ -107,7 +108,7 @@ namespace LibRender2.Shaders
 
 		public void SetCurrentAnimationMatricies(OpenBveApi.Objects.ObjectState objectState)
 		{
-			OpenTK.Matrix4[] matriciesToShader = new OpenTK.Matrix4[objectState.Matricies.Length];
+			Matrix4x4[] matriciesToShader = new Matrix4x4[objectState.Matricies.Length];
 
 			for (int i = 0; i < objectState.Matricies.Length; i++)
 			{
@@ -122,13 +123,13 @@ namespace LibRender2.Shaders
 				}
 
 				GL.BindBuffer(BufferTarget.UniformBuffer, objectState.MatrixBufferIndex);
-				GL.BufferData(BufferTarget.UniformBuffer, sizeof(OpenTK.Matrix4) * matriciesToShader.Length, matriciesToShader, BufferUsageHint.StaticDraw);
+				GL.BufferData(BufferTarget.UniformBuffer, sizeof(Matrix4x4) * matriciesToShader.Length, matriciesToShader, BufferUsageHint.StaticDraw);
 			}
 		}
 
-		private static OpenTK.Matrix4 ConvertToMatrix4(OpenBveApi.Math.Matrix4D mat)
+		private static Matrix4x4 ConvertToMatrix4(OpenBveApi.Math.Matrix4D mat)
 		{
-			return new OpenTK.Matrix4(
+			return new Matrix4x4(
 				(float)mat.Row0.X, (float)mat.Row0.Y, (float)mat.Row0.Z, (float)mat.Row0.W,
 				(float)mat.Row1.X, (float)mat.Row1.Y, (float)mat.Row1.Z, (float)mat.Row1.W,
 				(float)mat.Row2.X, (float)mat.Row2.Y, (float)mat.Row2.Z, (float)mat.Row2.W,

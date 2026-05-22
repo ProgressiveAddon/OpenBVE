@@ -9,7 +9,7 @@ using OpenBveApi.Objects;
 using OpenBveApi.Runtime;
 using OpenTK.Graphics.OpenGL;
 using TrainManager.Car;
-using Vector2 = OpenTK.Vector2;
+using Vector2 = System.Numerics.Vector2;
 
 namespace OpenBve.Graphics.Renderers
 {

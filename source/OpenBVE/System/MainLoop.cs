@@ -150,7 +150,7 @@ namespace OpenBve
 				switch (Program.Renderer.CurrentInterface)
 				{
 					case InterfaceType.Normal:
-						Program.Renderer.Touch.TouchCheck(new Vector2(e.X, e.Y));
+						Program.Renderer.Touch.TouchCheck(new System.Numerics.Vector2(e.X, e.Y));
 						break;
 					case InterfaceType.Menu:
 					case InterfaceType.GLMainMenu:
@@ -176,7 +176,7 @@ namespace OpenBve
 			{
 				if (Program.Renderer.CurrentInterface == InterfaceType.Normal)
 				{
-					Program.Renderer.Touch.LeaveCheck(new Vector2(e.X, e.Y));
+					Program.Renderer.Touch.LeaveCheck(new System.Numerics.Vector2(e.X, e.Y));
 				}
 			}
 		}
