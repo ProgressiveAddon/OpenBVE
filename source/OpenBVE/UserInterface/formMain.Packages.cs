@@ -880,7 +880,7 @@ namespace OpenBve
 				if (!Program.CurrentHost.MonoRuntime)
 				{
 					//Mono doesn't support System.Security.AccessControl, so this doesn't work....
-					Directory.GetAccessControl(directory);
+					new System.IO.DirectoryInfo(directory).GetAccessControl();
 				}
 				// ReSharper disable once UnusedVariable
 				using (FileStream fs = File.OpenWrite(currentPackage.FileName))

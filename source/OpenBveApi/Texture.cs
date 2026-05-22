@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 
-namespace OpenBveApi.Texture {
+namespace OpenBveApi.LegacyTexture {
 	
 	// --- structures ---
 
