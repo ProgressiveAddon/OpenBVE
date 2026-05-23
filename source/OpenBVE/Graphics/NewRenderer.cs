@@ -281,7 +281,7 @@ namespace OpenBve.Graphics
 
 									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
 									Vector3 viewPos = localCentroid;
-									viewPos.Transform(modelViewMatrix);
+									viewPos.Transform(modelViewMatrix, false);
 
 									Color32 baseColor = material.EmissiveColor;
 									if (baseColor.R == 0 && baseColor.G == 0 && baseColor.B == 0)
@@ -371,7 +371,7 @@ namespace OpenBve.Graphics
 
 									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
 									Vector3 viewPos = localCentroid;
-									viewPos.Transform(modelViewMatrix);
+									viewPos.Transform(modelViewMatrix, false);
 
 									Color32 baseColor = material.EmissiveColor;
 									if (baseColor.R == 0 && baseColor.G == 0 && baseColor.B == 0)
