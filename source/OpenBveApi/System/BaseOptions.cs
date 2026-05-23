@@ -96,6 +96,8 @@ namespace OpenBveApi
 		public double ShadowNormalBias = 2.0;
 		/// <summary>Whether to filter shadow casters per cascade to improve performance.</summary>
 		public bool ShadowFilterCascades = true;
+		/// <summary>Whether to enable dynamic light emission from emissive objects.</summary>
+		public bool UseEmissiveLighting = true;
 
 
 		/// <summary>The sun azimuth in degrees</summary>

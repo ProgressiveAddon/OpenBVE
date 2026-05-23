@@ -229,6 +229,7 @@ namespace OpenBve {
             this.updownTimeAccelerationFactor = new System.Windows.Forms.NumericUpDown();
             this.checkBoxIsUseNewRenderer = new System.Windows.Forms.CheckBox();
             this.checkBoxLoadInAdvance = new System.Windows.Forms.CheckBox();
+            this.checkBoxUseEmissiveLighting = new System.Windows.Forms.CheckBox();
             this.groupBoxPackageOptions = new System.Windows.Forms.GroupBox();
             this.buttonMSTSTrainsetDirectory = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
@@ -3158,10 +3159,11 @@ namespace OpenBve {
             this.groupBoxAdvancedOptions.Controls.Add(this.updownTimeAccelerationFactor);
             this.groupBoxAdvancedOptions.Controls.Add(this.checkBoxIsUseNewRenderer);
             this.groupBoxAdvancedOptions.Controls.Add(this.checkBoxLoadInAdvance);
+            this.groupBoxAdvancedOptions.Controls.Add(this.checkBoxUseEmissiveLighting);
             this.groupBoxAdvancedOptions.ForeColor = System.Drawing.Color.Black;
             this.groupBoxAdvancedOptions.Location = new System.Drawing.Point(0, 323);
             this.groupBoxAdvancedOptions.Name = "groupBoxAdvancedOptions";
-            this.groupBoxAdvancedOptions.Size = new System.Drawing.Size(321, 208);
+            this.groupBoxAdvancedOptions.Size = new System.Drawing.Size(321, 227);
             this.groupBoxAdvancedOptions.TabIndex = 21;
             this.groupBoxAdvancedOptions.TabStop = false;
             this.groupBoxAdvancedOptions.Text = "Advanced Options";
@@ -3277,6 +3279,16 @@ namespace OpenBve {
             this.checkBoxLoadInAdvance.Text = "Load in advance";
             this.checkBoxLoadInAdvance.UseVisualStyleBackColor = true;
             this.checkBoxLoadInAdvance.CheckedChanged += new System.EventHandler(this.checkBoxLoadInAdvance_CheckedChanged);
+            // 
+            // checkBoxUseEmissiveLighting
+            // 
+            this.checkBoxUseEmissiveLighting.AutoSize = true;
+            this.checkBoxUseEmissiveLighting.Location = new System.Drawing.Point(8, 202);
+            this.checkBoxUseEmissiveLighting.Name = "checkBoxUseEmissiveLighting";
+            this.checkBoxUseEmissiveLighting.Size = new System.Drawing.Size(200, 17);
+            this.checkBoxUseEmissiveLighting.TabIndex = 21;
+            this.checkBoxUseEmissiveLighting.Text = "Enable emissive/image-based lighting";
+            this.checkBoxUseEmissiveLighting.UseVisualStyleBackColor = true;
             // 
             // groupBoxPackageOptions
             // 
@@ -7037,5 +7049,6 @@ namespace OpenBve {
 		private System.Windows.Forms.Label labelCameraTransitionSpeed;
 		private System.Windows.Forms.NumericUpDown updownCameraTransitionSpeed;
 		private System.Windows.Forms.Panel panelOptionsPage2;
+		private System.Windows.Forms.CheckBox checkBoxUseEmissiveLighting;
 	}
 }

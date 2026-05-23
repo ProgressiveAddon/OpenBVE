@@ -40,6 +40,10 @@ namespace OpenBve.Graphics
 		private Overlays overlays;
 		internal Touch Touch;
 
+		private readonly Vector3[] activeLightPositions = new Vector3[8];
+		private readonly Vector3[] activeLightColors = new Vector3[8];
+		private readonly double[] activeLightDistances = new double[8];
+
 		public override void Initialize()
 		{
 			base.Initialize();
@@ -245,6 +249,196 @@ namespace OpenBve.Graphics
 				alphaFaces = VisibleObjects.GetSortedPolygons();
 				overlayOpaqueFaces = VisibleObjects.OverlayOpaqueFaces.ToList();
 				overlayAlphaFaces = VisibleObjects.GetSortedPolygons(true);
+			}
+
+			int numActiveLights = 0;
+			if (AvailableNewRenderer && Interface.CurrentOptions.UseEmissiveLighting)
+			{
+				for (int i = 0; i < opaqueFaces.Count; i++)
+				{
+					FaceState face = opaqueFaces[i];
+					if (face.Object != null && face.Object.Prototype != null && face.Object.Prototype.Mesh != null && face.Object.Prototype.Mesh.Materials != null)
+					{
+						if (face.Face.Material < face.Object.Prototype.Mesh.Materials.Length)
+						{
+							MeshMaterial material = face.Object.Prototype.Mesh.Materials[face.Face.Material];
+							if ((material.Flags & MaterialFlags.Emissive) != 0)
+							{
+								int numVerts = face.Face.Vertices.Length;
+								if (numVerts > 0)
+								{
+									Vector3 localCentroid = Vector3.Zero;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											localCentroid += new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+										}
+									}
+									localCentroid *= (1.0 / numVerts);
+
+									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
+									Vector3 viewPos = localCentroid;
+									viewPos.Transform(modelViewMatrix);
+
+									Color32 baseColor = material.EmissiveColor;
+									if (baseColor.R == 0 && baseColor.G == 0 && baseColor.B == 0)
+									{
+										baseColor = material.Color;
+									}
+
+									Vector3 lightColor;
+									if (material.DaytimeTexture != null)
+									{
+										Color24 avgTexColor = material.DaytimeTexture.AverageColor;
+										lightColor = new Vector3(
+											(baseColor.R / 255.0f) * (avgTexColor.R / 255.0f),
+											(baseColor.G / 255.0f) * (avgTexColor.G / 255.0f),
+											(baseColor.B / 255.0f) * (avgTexColor.B / 255.0f)
+										);
+									}
+									else
+									{
+										lightColor = new Vector3(
+											baseColor.R / 255.0f,
+											baseColor.G / 255.0f,
+											baseColor.B / 255.0f
+										);
+									}
+
+									double distanceSquared = viewPos.NormSquared();
+									if (numActiveLights < 8)
+									{
+										int insertIdx = numActiveLights;
+										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
+										{
+											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
+											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
+											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
+											insertIdx--;
+										}
+										activeLightDistances[insertIdx] = distanceSquared;
+										activeLightPositions[insertIdx] = viewPos;
+										activeLightColors[insertIdx] = lightColor;
+										numActiveLights++;
+									}
+									else if (distanceSquared < activeLightDistances[7])
+									{
+										int insertIdx = 7;
+										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
+										{
+											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
+											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
+											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
+											insertIdx--;
+										}
+										activeLightDistances[insertIdx] = distanceSquared;
+										activeLightPositions[insertIdx] = viewPos;
+										activeLightColors[insertIdx] = lightColor;
+									}
+								}
+							}
+						}
+					}
+				}
+
+				for (int i = 0; i < alphaFaces.Count; i++)
+				{
+					FaceState face = alphaFaces[i];
+					if (face.Object != null && face.Object.Prototype != null && face.Object.Prototype.Mesh != null && face.Object.Prototype.Mesh.Materials != null)
+					{
+						if (face.Face.Material < face.Object.Prototype.Mesh.Materials.Length)
+						{
+							MeshMaterial material = face.Object.Prototype.Mesh.Materials[face.Face.Material];
+							if ((material.Flags & MaterialFlags.Emissive) != 0)
+							{
+								int numVerts = face.Face.Vertices.Length;
+								if (numVerts > 0)
+								{
+									Vector3 localCentroid = Vector3.Zero;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											localCentroid += new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+										}
+									}
+									localCentroid *= (1.0 / numVerts);
+
+									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
+									Vector3 viewPos = localCentroid;
+									viewPos.Transform(modelViewMatrix);
+
+									Color32 baseColor = material.EmissiveColor;
+									if (baseColor.R == 0 && baseColor.G == 0 && baseColor.B == 0)
+									{
+										baseColor = material.Color;
+									}
+
+									Vector3 lightColor;
+									if (material.DaytimeTexture != null)
+									{
+										Color24 avgTexColor = material.DaytimeTexture.AverageColor;
+										lightColor = new Vector3(
+											(baseColor.R / 255.0f) * (avgTexColor.R / 255.0f),
+											(baseColor.G / 255.0f) * (avgTexColor.G / 255.0f),
+											(baseColor.B / 255.0f) * (avgTexColor.B / 255.0f)
+										);
+									}
+									else
+									{
+										lightColor = new Vector3(
+											baseColor.R / 255.0f,
+											baseColor.G / 255.0f,
+											baseColor.B / 255.0f
+										);
+									}
+
+									double distanceSquared = viewPos.NormSquared();
+									if (numActiveLights < 8)
+									{
+										int insertIdx = numActiveLights;
+										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
+										{
+											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
+											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
+											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
+											insertIdx--;
+										}
+										activeLightDistances[insertIdx] = distanceSquared;
+										activeLightPositions[insertIdx] = viewPos;
+										activeLightColors[insertIdx] = lightColor;
+										numActiveLights++;
+									}
+									else if (distanceSquared < activeLightDistances[7])
+									{
+										int insertIdx = 7;
+										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
+										{
+											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
+											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
+											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
+											insertIdx--;
+										}
+										activeLightDistances[insertIdx] = distanceSquared;
+										activeLightPositions[insertIdx] = viewPos;
+										activeLightColors[insertIdx] = lightColor;
+									}
+								}
+							}
+						}
+					}
+				}
+
+				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, numActiveLights);
+			}
+			else if (AvailableNewRenderer)
+			{
+				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, 0);
 			}
 
 			foreach (FaceState face in opaqueFaces)

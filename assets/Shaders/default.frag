@@ -66,6 +66,14 @@ struct Light
 };
 uniform Light uLight;
 
+struct DynamicLight
+{
+	vec3 position;
+	vec3 color;
+};
+uniform int uNumDynamicLights;
+uniform DynamicLight uDynamicLights[8];
+
 // Inputs from vertex shader
 in vec3  vNormal;
 in vec4  vPosLightSpace0;
@@ -254,8 +262,23 @@ void main(void)
 	
 	if ((uMaterialFlags & 1) == 0 && (uMaterialFlags & 4) == 0)
 	{
-		// Material is not emissive, apply shadow to the light factor
-		finalColor.rgb *= (oLightResult.rgb * shadow);
+		vec3 dynamicLightContribution = vec3(0.0);
+		if (uNumDynamicLights > 0)
+		{
+			vec3 normal = normalize(vNormal);
+			for (int i = 0; i < uNumDynamicLights; i++)
+			{
+				vec3 lightDir = uDynamicLights[i].position - oViewPos.xyz;
+				float dist = length(lightDir);
+				lightDir = normalize(lightDir);
+				float diff = max(dot(normal, lightDir), 0.0);
+				float attenuation = 1.0 / (1.0 + 0.05 * dist + 0.02 * dist * dist);
+				dynamicLightContribution += uDynamicLights[i].color * diff * attenuation;
+			}
+		}
+
+		// Material is not emissive, apply shadow to the light factor and add dynamic lights
+		finalColor.rgb *= (oLightResult.rgb * shadow + dynamicLightContribution);
 		finalColor.a *= oLightResult.a;
 	}
 	else

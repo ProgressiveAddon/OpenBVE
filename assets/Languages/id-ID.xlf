@@ -1574,6 +1574,10 @@
 						<source>Enable the new renderer</source>
 						<target>Gunakan mode render terbaru</target>
 					</trans-unit>
+					<trans-unit id="advanced_emissive_lighting">
+						<source>Enable dynamic emissive lighting</source>
+						<target>Aktifkan pencahayaan emisi dinamis</target>
+					</trans-unit>
 					<trans-unit id="advanced_timefactor">
 						<source>Accelerated Time Factor</source>
 						<target>Tingkat percepatan waktu</target>
@@ -1840,6 +1844,10 @@
 					<trans-unit id="new_renderer">
 						<source>Enable the modern shader-based renderer. Recommended for better visuals and performance on modern hardware.</source>
 						<target>Aktifkan renderer berbasis shader modern. Direkomasikan untuk visual dan performa yang lebih baik pada perangkat keras modern.</target>
+					</trans-unit>
+					<trans-unit id="emissive_lighting">
+						<source>Enables dynamic light emission from emissive objects/textures (e.g. signals, lamps).</source>
+						<target>Mengaktifkan pancaran cahaya dinamis dari objek/tekstur emisi (seperti sinyal, lampu).</target>
 					</trans-unit>
 				</group>
 				<group id="dialog">

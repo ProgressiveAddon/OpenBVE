@@ -463,6 +463,7 @@ namespace OpenBve {
 			checkBoxLoadInAdvance.Checked = Interface.CurrentOptions.LoadInAdvance;
 			checkBoxUnloadTextures.Checked = Interface.CurrentOptions.UnloadUnusedTextures;
 			checkBoxIsUseNewRenderer.Checked = Interface.CurrentOptions.IsUseNewRenderer;
+			checkBoxUseEmissiveLighting.Checked = Interface.CurrentOptions.UseEmissiveLighting;
 			// Shadow Resolution
 			switch (Interface.CurrentOptions.ShadowResolution)
 			{
@@ -806,6 +807,7 @@ namespace OpenBve {
 			checkBoxLoadInAdvance.Text = Translations.GetInterfaceString(HostApplication.OpenBve, new[] {"options","advanced_load_advance"});
 			checkBoxUnloadTextures.Text = Translations.GetInterfaceString(HostApplication.OpenBve, new[] {"options","advanced_unload_textures"});
 			checkBoxIsUseNewRenderer.Text = Translations.GetInterfaceString(HostApplication.OpenBve, new[] {"options","advanced_is_use_new_renderer"});
+			checkBoxUseEmissiveLighting.Text = Translations.GetInterfaceString(HostApplication.OpenBve, new[] {"options","advanced_emissive_lighting"});
 			labelTimeAcceleration.Text = Translations.GetInterfaceString(HostApplication.OpenBve, new[] {"options","advanced_timefactor"});
 			labelCursor.Text = Translations.GetInterfaceString(HostApplication.OpenBve, new[] {"options","advanced_cursor"});
 			//Other Options
@@ -1177,6 +1179,7 @@ namespace OpenBve {
 			SetToolTip("viewingdistance", labelDistance, updownDistance);
 			SetToolTip("motionblur", labelMotionBlur, comboboxMotionBlur);
 			SetToolTip("new_renderer", checkBoxIsUseNewRenderer);
+			SetToolTip("emissive_lighting", checkBoxUseEmissiveLighting);
 		}
 
 		/// <summary>Sets the tooltip for one or more controls using a translation key</summary>
@@ -1234,6 +1237,7 @@ namespace OpenBve {
 			Interface.CurrentOptions.OldTransparencyMode = checkBoxTransparencyFix.Checked;
 			Interface.CurrentOptions.EnableBveTsHacks = checkBoxHacks.Checked;
 			Interface.CurrentOptions.IsUseNewRenderer = checkBoxIsUseNewRenderer.Checked;
+			Interface.CurrentOptions.UseEmissiveLighting = checkBoxUseEmissiveLighting.Checked;
 			// Shadow Resolution
 			switch (comboboxShadowResolution.SelectedIndex)
 			{

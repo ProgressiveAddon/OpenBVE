@@ -400,6 +400,82 @@ namespace OpenBveApi.Textures {
 		private bool knownTransparencyType;
 		private TextureTransparencyType transparencyType;
 
+		private Color24? averageColor;
+		/// <summary>Gets the pre-computed average color of the texture for dynamic light emissions.</summary>
+		public Color24 AverageColor
+		{
+			get
+			{
+				if (averageColor.HasValue)
+				{
+					return averageColor.Value;
+				}
+
+				byte[] bytes = Bytes;
+				if (bytes == null || bytes.Length == 0)
+				{
+					averageColor = new Color24(255, 255, 255);
+					return averageColor.Value;
+				}
+
+				long r = 0, g = 0, b = 0;
+				int count = 0;
+				int step = 4;
+				if (PixelFormat == PixelFormat.RGB) step = 3;
+				else if (PixelFormat == PixelFormat.Grayscale) step = 1;
+				else if (PixelFormat == PixelFormat.GrayscaleAlpha) step = 2;
+
+				int stride = System.Math.Max(1, bytes.Length / (step * 256));
+				
+				for (int i = 0; i < bytes.Length; i += step * stride)
+				{
+					if (i + step - 1 >= bytes.Length) break;
+					
+					switch (PixelFormat)
+					{
+						case PixelFormat.Grayscale:
+							r += bytes[i];
+							g += bytes[i];
+							b += bytes[i];
+							count++;
+							break;
+						case PixelFormat.GrayscaleAlpha:
+							r += bytes[i];
+							g += bytes[i];
+							b += bytes[i];
+							count++;
+							break;
+						case PixelFormat.RGB:
+							r += bytes[i];
+							g += bytes[i + 1];
+							b += bytes[i + 2];
+							count++;
+							break;
+						case PixelFormat.RGBAlpha:
+							byte alpha = bytes[i + 3];
+							if (alpha > 0)
+							{
+								r += bytes[i] * alpha / 255;
+								g += bytes[i + 1] * alpha / 255;
+								b += bytes[i + 2] * alpha / 255;
+								count++;
+							}
+							break;
+					}
+				}
+
+				if (count > 0)
+				{
+					averageColor = new Color24((byte)(r / count), (byte)(g / count), (byte)(b / count));
+				}
+				else
+				{
+					averageColor = new Color24(255, 255, 255);
+				}
+				return averageColor.Value;
+			}
+		}
+
 		/// <summary>Inverts the lightness values of a texture used for a glow</summary>
 		public void InvertLightness()
 		{
