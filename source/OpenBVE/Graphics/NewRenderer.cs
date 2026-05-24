@@ -40,9 +40,36 @@ namespace OpenBve.Graphics
 		private Overlays overlays;
 		internal Touch Touch;
 
-		private readonly Vector3[] activeLightPositions = new Vector3[8];
-		private readonly Vector3[] activeLightColors = new Vector3[8];
-		private readonly double[] activeLightDistances = new double[8];
+		private const int MaxDynamicLights = 32;
+		private readonly Vector3[] activeLightPositions = new Vector3[MaxDynamicLights];
+		private readonly Vector3[] activeLightColors = new Vector3[MaxDynamicLights];
+		private readonly float[] activeLightRanges = new float[MaxDynamicLights];
+		private readonly float[] activeLightSizes = new float[MaxDynamicLights];
+
+		private struct TempLight
+		{
+			public Vector3 Position;
+			public Vector3 Color;
+			public double MaxFaceDim;
+			public int Count;
+		}
+
+		private struct FinalLight : IComparable<FinalLight>
+		{
+			public Vector3 Position;
+			public Vector3 Color;
+			public float Range;
+			public float Size;
+			public double DistanceSquared;
+
+			public int CompareTo(FinalLight other)
+			{
+				return DistanceSquared.CompareTo(other.DistanceSquared);
+			}
+		}
+
+		private readonly List<TempLight> tempLights = new List<TempLight>();
+		private readonly List<FinalLight> finalLights = new List<FinalLight>();
 
 		public override void Initialize()
 		{
@@ -251,9 +278,10 @@ namespace OpenBve.Graphics
 				overlayAlphaFaces = VisibleObjects.GetSortedPolygons(true);
 			}
 
-			int numActiveLights = 0;
 			if (AvailableNewRenderer && Interface.CurrentOptions.UseEmissiveLighting)
 			{
+				tempLights.Clear();
+
 				for (int i = 0; i < opaqueFaces.Count; i++)
 				{
 					FaceState face = opaqueFaces[i];
@@ -268,16 +296,72 @@ namespace OpenBve.Graphics
 								if (numVerts > 0)
 								{
 									Vector3 localCentroid = Vector3.Zero;
+									bool isAnimated = face.Object.Matricies != null && face.Object.Matricies.Length > 0;
+									Vector3[] triVerts = new Vector3[3];
+									int triVertCount = 0;
 									for (int j = 0; j < numVerts; j++)
 									{
 										int vIdx = face.Face.Vertices[j].Index;
 										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
 										{
 											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
-											localCentroid += new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 zFlipped = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											localCentroid += zFlipped;
+											if (triVertCount < 3) triVerts[triVertCount++] = zFlipped;
 										}
 									}
 									localCentroid *= (1.0 / numVerts);
+
+									double maxFaceDim = 0.0;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 vPos = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											double dist = (vPos - localCentroid).Norm();
+											if (dist > maxFaceDim)
+											{
+												maxFaceDim = dist;
+											}
+										}
+									}
+
+									if (triVertCount >= 3 && maxFaceDim > 1e-6)
+									{
+										Vector3 edge1 = triVerts[1] - triVerts[0];
+										Vector3 edge2 = triVerts[2] - triVerts[0];
+										Vector3 faceNormal = Vector3.Cross(edge1, edge2);
+										double normalLen = faceNormal.Norm();
+										if (normalLen > 1e-10)
+										{
+											faceNormal *= 1.0 / normalLen;
+											localCentroid += faceNormal * (maxFaceDim * 0.5);
+										}
+									}
 
 									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
 									Vector3 viewPos = localCentroid;
@@ -309,34 +393,41 @@ namespace OpenBve.Graphics
 									}
 
 									double distanceSquared = viewPos.NormSquared();
-									if (numActiveLights < 8)
+									if (distanceSquared > 62500.0) // 250m max range
 									{
-										int insertIdx = numActiveLights;
-										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
-										{
-											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
-											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
-											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
-											insertIdx--;
-										}
-										activeLightDistances[insertIdx] = distanceSquared;
-										activeLightPositions[insertIdx] = viewPos;
-										activeLightColors[insertIdx] = lightColor;
-										numActiveLights++;
+										continue;
 									}
-									else if (distanceSquared < activeLightDistances[7])
+
+									bool merged = false;
+									for (int k = 0; k < tempLights.Count; k++)
 									{
-										int insertIdx = 7;
-										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
+										Vector3 currentCenter = tempLights[k].Position * (1.0 / tempLights[k].Count);
+										if ((currentCenter - viewPos).NormSquared() < 36.0) // 6 meters threshold
 										{
-											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
-											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
-											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
-											insertIdx--;
+											TempLight tl = tempLights[k];
+											tl.Position += viewPos;
+											tl.Color += lightColor;
+											if (maxFaceDim > tl.MaxFaceDim)
+											{
+												tl.MaxFaceDim = maxFaceDim;
+											}
+											tl.Count++;
+											tempLights[k] = tl;
+											merged = true;
+											break;
 										}
-										activeLightDistances[insertIdx] = distanceSquared;
-										activeLightPositions[insertIdx] = viewPos;
-										activeLightColors[insertIdx] = lightColor;
+									}
+
+									if (!merged)
+									{
+										TempLight tl = new TempLight
+										{
+											Position = viewPos,
+											Color = lightColor,
+											MaxFaceDim = maxFaceDim,
+											Count = 1
+										};
+										tempLights.Add(tl);
 									}
 								}
 							}
@@ -358,16 +449,72 @@ namespace OpenBve.Graphics
 								if (numVerts > 0)
 								{
 									Vector3 localCentroid = Vector3.Zero;
+									bool isAnimated = face.Object.Matricies != null && face.Object.Matricies.Length > 0;
+									Vector3[] triVerts = new Vector3[3];
+									int triVertCount = 0;
 									for (int j = 0; j < numVerts; j++)
 									{
 										int vIdx = face.Face.Vertices[j].Index;
 										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
 										{
 											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
-											localCentroid += new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 zFlipped = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											localCentroid += zFlipped;
+											if (triVertCount < 3) triVerts[triVertCount++] = zFlipped;
 										}
 									}
 									localCentroid *= (1.0 / numVerts);
+
+									double maxFaceDim = 0.0;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 vPos = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											double dist = (vPos - localCentroid).Norm();
+											if (dist > maxFaceDim)
+											{
+												maxFaceDim = dist;
+											}
+										}
+									}
+
+									if (triVertCount >= 3 && maxFaceDim > 1e-6)
+									{
+										Vector3 edge1 = triVerts[1] - triVerts[0];
+										Vector3 edge2 = triVerts[2] - triVerts[0];
+										Vector3 faceNormal = Vector3.Cross(edge1, edge2);
+										double normalLen = faceNormal.Norm();
+										if (normalLen > 1e-10)
+										{
+											faceNormal *= 1.0 / normalLen;
+											localCentroid += faceNormal * (maxFaceDim * 0.5);
+										}
+									}
 
 									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
 									Vector3 viewPos = localCentroid;
@@ -399,34 +546,41 @@ namespace OpenBve.Graphics
 									}
 
 									double distanceSquared = viewPos.NormSquared();
-									if (numActiveLights < 8)
+									if (distanceSquared > 62500.0) // 250m max range
 									{
-										int insertIdx = numActiveLights;
-										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
-										{
-											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
-											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
-											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
-											insertIdx--;
-										}
-										activeLightDistances[insertIdx] = distanceSquared;
-										activeLightPositions[insertIdx] = viewPos;
-										activeLightColors[insertIdx] = lightColor;
-										numActiveLights++;
+										continue;
 									}
-									else if (distanceSquared < activeLightDistances[7])
+
+									bool merged = false;
+									for (int k = 0; k < tempLights.Count; k++)
 									{
-										int insertIdx = 7;
-										while (insertIdx > 0 && activeLightDistances[insertIdx - 1] > distanceSquared)
+										Vector3 currentCenter = tempLights[k].Position * (1.0 / tempLights[k].Count);
+										if ((currentCenter - viewPos).NormSquared() < 36.0) // 6 meters threshold
 										{
-											activeLightDistances[insertIdx] = activeLightDistances[insertIdx - 1];
-											activeLightPositions[insertIdx] = activeLightPositions[insertIdx - 1];
-											activeLightColors[insertIdx] = activeLightColors[insertIdx - 1];
-											insertIdx--;
+											TempLight tl = tempLights[k];
+											tl.Position += viewPos;
+											tl.Color += lightColor;
+											if (maxFaceDim > tl.MaxFaceDim)
+											{
+												tl.MaxFaceDim = maxFaceDim;
+											}
+											tl.Count++;
+											tempLights[k] = tl;
+											merged = true;
+											break;
 										}
-										activeLightDistances[insertIdx] = distanceSquared;
-										activeLightPositions[insertIdx] = viewPos;
-										activeLightColors[insertIdx] = lightColor;
+									}
+
+									if (!merged)
+									{
+										TempLight tl = new TempLight
+										{
+											Position = viewPos,
+											Color = lightColor,
+											MaxFaceDim = maxFaceDim,
+											Count = 1
+										};
+										tempLights.Add(tl);
 									}
 								}
 							}
@@ -434,11 +588,48 @@ namespace OpenBve.Graphics
 					}
 				}
 
-				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, numActiveLights);
+				finalLights.Clear();
+				for (int i = 0; i < tempLights.Count; i++)
+				{
+					double invCount = 1.0 / tempLights[i].Count;
+					Vector3 pos = tempLights[i].Position * invCount;
+					Vector3 col = tempLights[i].Color;
+					col.X = Math.Min(col.X, 1.0);
+					col.Y = Math.Min(col.Y, 1.0);
+					col.Z = Math.Min(col.Z, 1.0);
+
+					float range = (float)Math.Min(250.0, 15.0 + tempLights[i].MaxFaceDim * 150.0);
+					float size = (float)tempLights[i].MaxFaceDim;
+
+					finalLights.Add(new FinalLight
+					{
+						Position = pos,
+						Color = col,
+						Range = range,
+						Size = size,
+						DistanceSquared = pos.NormSquared()
+					});
+				}
+
+				finalLights.Sort();
+				int numActiveLights = Math.Min(finalLights.Count, MaxDynamicLights);
+				for (int i = 0; i < numActiveLights; i++)
+				{
+					activeLightPositions[i] = finalLights[i].Position;
+					activeLightColors[i] = finalLights[i].Color;
+					if (i >= 24)
+					{
+						activeLightColors[i] *= (MaxDynamicLights - i) / 8.0f;
+					}
+					activeLightRanges[i] = finalLights[i].Range;
+					activeLightSizes[i] = finalLights[i].Size;
+				}
+
+				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, activeLightRanges, activeLightSizes, numActiveLights);
 			}
 			else if (AvailableNewRenderer)
 			{
-				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, 0);
+				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, activeLightRanges, activeLightSizes, 0);
 			}
 
 			foreach (FaceState face in opaqueFaces)

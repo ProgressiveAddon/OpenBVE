@@ -35,6 +35,37 @@ namespace RouteViewer
 		internal bool OptionEvents = false;
 		internal bool OptionPaths = false;
 
+		private const int MaxDynamicLights = 32;
+		private readonly Vector3[] activeLightPositions = new Vector3[MaxDynamicLights];
+		private readonly Vector3[] activeLightColors = new Vector3[MaxDynamicLights];
+		private readonly float[] activeLightRanges = new float[MaxDynamicLights];
+		private readonly float[] activeLightSizes = new float[MaxDynamicLights];
+
+		private struct TempLight
+		{
+			public Vector3 Position;
+			public Vector3 Color;
+			public double MaxFaceDim;
+			public int Count;
+		}
+
+		private struct FinalLight : IComparable<FinalLight>
+		{
+			public Vector3 Position;
+			public Vector3 Color;
+			public float Range;
+			public float Size;
+			public double DistanceSquared;
+
+			public int CompareTo(FinalLight other)
+			{
+				return DistanceSquared.CompareTo(other.DistanceSquared);
+			}
+		}
+
+		private readonly List<TempLight> tempLights = new List<TempLight>();
+		private readonly List<FinalLight> finalLights = new List<FinalLight>();
+
 		// textures
 		private Texture BrightnessChangeTexture;
 		private Texture BackgroundChangeTexture;
@@ -206,6 +237,368 @@ namespace RouteViewer
 			{
 				opaqueFaces = VisibleObjects.OpaqueFaces.ToList();
 				alphaFaces = VisibleObjects.GetSortedPolygons();
+			}
+
+			if (AvailableNewRenderer && Interface.CurrentOptions.UseEmissiveLighting)
+			{
+				tempLights.Clear();
+
+				for (int i = 0; i < opaqueFaces.Count; i++)
+				{
+					FaceState face = opaqueFaces[i];
+					if (face.Object != null && face.Object.Prototype != null && face.Object.Prototype.Mesh != null && face.Object.Prototype.Mesh.Materials != null)
+					{
+						if (face.Face.Material < face.Object.Prototype.Mesh.Materials.Length)
+						{
+							MeshMaterial material = face.Object.Prototype.Mesh.Materials[face.Face.Material];
+							if ((material.Flags & MaterialFlags.Emissive) != 0)
+							{
+								int numVerts = face.Face.Vertices.Length;
+								if (numVerts > 0)
+								{
+									Vector3 localCentroid = Vector3.Zero;
+									bool isAnimated = face.Object.Matricies != null && face.Object.Matricies.Length > 0;
+									// Store first 3 vertex positions (Z-flipped) for face normal calculation
+									Vector3[] triVerts = new Vector3[3];
+									int triVertCount = 0;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 zFlipped = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											localCentroid += zFlipped;
+											if (triVertCount < 3) triVerts[triVertCount++] = zFlipped;
+										}
+									}
+									localCentroid *= (1.0 / numVerts);
+
+									double maxFaceDim = 0.0;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 vPos = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											double dist = (vPos - localCentroid).Norm();
+											if (dist > maxFaceDim)
+											{
+												maxFaceDim = dist;
+											}
+										}
+									}
+
+									// Offset the centroid along the face normal so the light appears
+									// to emanate FROM the face surface, not from a point in its plane
+									if (triVertCount >= 3 && maxFaceDim > 1e-6)
+									{
+										Vector3 edge1 = triVerts[1] - triVerts[0];
+										Vector3 edge2 = triVerts[2] - triVerts[0];
+										Vector3 faceNormal = Vector3.Cross(edge1, edge2);
+										double normalLen = faceNormal.Norm();
+										if (normalLen > 1e-10)
+										{
+											faceNormal *= 1.0 / normalLen;
+											// Push light in front of face by half the face radius
+											localCentroid += faceNormal * (maxFaceDim * 0.5);
+										}
+									}
+
+									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
+									Vector3 viewPos = localCentroid;
+									viewPos.Transform(modelViewMatrix, false);
+
+									Color32 baseColor = material.EmissiveColor;
+									if (baseColor.R == 0 && baseColor.G == 0 && baseColor.B == 0)
+									{
+										baseColor = material.Color;
+									}
+
+									Vector3 lightColor;
+									if (material.DaytimeTexture != null)
+									{
+										Color24 avgTexColor = material.DaytimeTexture.AverageColor;
+										lightColor = new Vector3(
+											(baseColor.R / 255.0f) * (avgTexColor.R / 255.0f),
+											(baseColor.G / 255.0f) * (avgTexColor.G / 255.0f),
+											(baseColor.B / 255.0f) * (avgTexColor.B / 255.0f)
+										);
+									}
+									else
+									{
+										lightColor = new Vector3(
+											baseColor.R / 255.0f,
+											baseColor.G / 255.0f,
+											baseColor.B / 255.0f
+										);
+									}
+
+									double distanceSquared = viewPos.NormSquared();
+									if (distanceSquared > 62500.0) // 250m max range
+									{
+										continue;
+									}
+
+									bool merged = false;
+									for (int k = 0; k < tempLights.Count; k++)
+									{
+										Vector3 currentCenter = tempLights[k].Position * (1.0 / tempLights[k].Count);
+										if ((currentCenter - viewPos).NormSquared() < 36.0) // 6 meters threshold
+										{
+											TempLight tl = tempLights[k];
+											tl.Position += viewPos;
+											tl.Color += lightColor;
+											if (maxFaceDim > tl.MaxFaceDim)
+											{
+												tl.MaxFaceDim = maxFaceDim;
+											}
+											tl.Count++;
+											tempLights[k] = tl;
+											merged = true;
+											break;
+										}
+									}
+
+									if (!merged)
+									{
+										TempLight tl = new TempLight
+										{
+											Position = viewPos,
+											Color = lightColor,
+											MaxFaceDim = maxFaceDim,
+											Count = 1
+										};
+										tempLights.Add(tl);
+									}
+								}
+							}
+						}
+					}
+				}
+
+				for (int i = 0; i < alphaFaces.Count; i++)
+				{
+					FaceState face = alphaFaces[i];
+					if (face.Object != null && face.Object.Prototype != null && face.Object.Prototype.Mesh != null && face.Object.Prototype.Mesh.Materials != null)
+					{
+						if (face.Face.Material < face.Object.Prototype.Mesh.Materials.Length)
+						{
+							MeshMaterial material = face.Object.Prototype.Mesh.Materials[face.Face.Material];
+							if ((material.Flags & MaterialFlags.Emissive) != 0)
+							{
+								int numVerts = face.Face.Vertices.Length;
+								if (numVerts > 0)
+								{
+									Vector3 localCentroid = Vector3.Zero;
+									bool isAnimated = face.Object.Matricies != null && face.Object.Matricies.Length > 0;
+									// Store first 3 vertex positions (Z-flipped) for face normal calculation
+									Vector3[] triVerts = new Vector3[3];
+									int triVertCount = 0;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 zFlipped = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											localCentroid += zFlipped;
+											if (triVertCount < 3) triVerts[triVertCount++] = zFlipped;
+										}
+									}
+									localCentroid *= (1.0 / numVerts);
+
+									double maxFaceDim = 0.0;
+									for (int j = 0; j < numVerts; j++)
+									{
+										int vIdx = face.Face.Vertices[j].Index;
+										if (vIdx < face.Object.Prototype.Mesh.Vertices.Length)
+										{
+											Vector3 vertexCoord = face.Object.Prototype.Mesh.Vertices[vIdx].Coordinates;
+											if (isAnimated && face.Object.Prototype.Mesh.Vertices[vIdx] is AnimatedVertex av)
+											{
+												for (int k = 0; k < av.MatrixChain.Length; k++)
+												{
+													int m = av.MatrixChain[k];
+													if (m >= 0 && m < face.Object.Matricies.Length)
+													{
+														vertexCoord.Transform(face.Object.Matricies[m], false);
+													}
+												}
+											}
+											Vector3 vPos = new Vector3(vertexCoord.X, vertexCoord.Y, -vertexCoord.Z);
+											double dist = (vPos - localCentroid).Norm();
+											if (dist > maxFaceDim)
+											{
+												maxFaceDim = dist;
+											}
+										}
+									}
+
+									// Offset the centroid along the face normal so the light appears
+									// to emanate FROM the face surface, not from a point in its plane
+									if (triVertCount >= 3 && maxFaceDim > 1e-6)
+									{
+										Vector3 edge1 = triVerts[1] - triVerts[0];
+										Vector3 edge2 = triVerts[2] - triVerts[0];
+										Vector3 faceNormal = Vector3.Cross(edge1, edge2);
+										double normalLen = faceNormal.Norm();
+										if (normalLen > 1e-10)
+										{
+											faceNormal *= 1.0 / normalLen;
+											// Push light in front of face by half the face radius
+											localCentroid += faceNormal * (maxFaceDim * 0.5);
+										}
+									}
+
+									Matrix4D modelViewMatrix = face.Object.ModelMatrix * Camera.TranslationMatrix * CurrentViewMatrix;
+									Vector3 viewPos = localCentroid;
+									viewPos.Transform(modelViewMatrix, false);
+
+									Color32 baseColor = material.EmissiveColor;
+									if (baseColor.R == 0 && baseColor.G == 0 && baseColor.B == 0)
+									{
+										baseColor = material.Color;
+									}
+
+									Vector3 lightColor;
+									if (material.DaytimeTexture != null)
+									{
+										Color24 avgTexColor = material.DaytimeTexture.AverageColor;
+										lightColor = new Vector3(
+											(baseColor.R / 255.0f) * (avgTexColor.R / 255.0f),
+											(baseColor.G / 255.0f) * (avgTexColor.G / 255.0f),
+											(baseColor.B / 255.0f) * (avgTexColor.B / 255.0f)
+										);
+									}
+									else
+									{
+										lightColor = new Vector3(
+											baseColor.R / 255.0f,
+											baseColor.G / 255.0f,
+											baseColor.B / 255.0f
+										);
+									}
+
+									double distanceSquared = viewPos.NormSquared();
+									if (distanceSquared > 62500.0) // 250m max range
+									{
+										continue;
+									}
+
+									bool merged = false;
+									for (int k = 0; k < tempLights.Count; k++)
+									{
+										Vector3 currentCenter = tempLights[k].Position * (1.0 / tempLights[k].Count);
+										if ((currentCenter - viewPos).NormSquared() < 36.0) // 6 meters threshold
+										{
+											TempLight tl = tempLights[k];
+											tl.Position += viewPos;
+											tl.Color += lightColor;
+											if (maxFaceDim > tl.MaxFaceDim)
+											{
+												tl.MaxFaceDim = maxFaceDim;
+											}
+											tl.Count++;
+											tempLights[k] = tl;
+											merged = true;
+											break;
+										}
+									}
+
+									if (!merged)
+									{
+										TempLight tl = new TempLight
+										{
+											Position = viewPos,
+											Color = lightColor,
+											MaxFaceDim = maxFaceDim,
+											Count = 1
+										};
+										tempLights.Add(tl);
+									}
+								}
+							}
+						}
+					}
+				}
+
+				finalLights.Clear();
+				for (int i = 0; i < tempLights.Count; i++)
+				{
+					double invCount = 1.0 / tempLights[i].Count;
+					Vector3 pos = tempLights[i].Position * invCount;
+					Vector3 col = tempLights[i].Color;
+					col.X = Math.Min(col.X, 1.0);
+					col.Y = Math.Min(col.Y, 1.0);
+					col.Z = Math.Min(col.Z, 1.0);
+
+					float range = (float)Math.Min(250.0, 15.0 + tempLights[i].MaxFaceDim * 150.0);
+					float size = (float)tempLights[i].MaxFaceDim;
+
+					finalLights.Add(new FinalLight
+					{
+						Position = pos,
+						Color = col,
+						Range = range,
+						Size = size,
+						DistanceSquared = pos.NormSquared()
+					});
+				}
+
+				finalLights.Sort();
+				int numActiveLights = Math.Min(finalLights.Count, MaxDynamicLights);
+				for (int i = 0; i < numActiveLights; i++)
+				{
+					activeLightPositions[i] = finalLights[i].Position;
+					activeLightColors[i] = finalLights[i].Color;
+					if (i >= 24)
+					{
+						activeLightColors[i] *= (MaxDynamicLights - i) / 8.0f;
+					}
+					activeLightRanges[i] = finalLights[i].Range;
+					activeLightSizes[i] = finalLights[i].Size;
+				}
+
+				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, activeLightRanges, activeLightSizes, numActiveLights);
+			}
+			else if (AvailableNewRenderer)
+			{
+				DefaultShader.SetDynamicLights(activeLightPositions, activeLightColors, activeLightRanges, activeLightSizes, 0);
 			}
 			
 			foreach (FaceState face in opaqueFaces)

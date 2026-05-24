@@ -68,8 +68,8 @@ namespace LibRender2.Shaders
 		private readonly int uModelMatrixLocation;
 		private readonly int uCurrentViewMatrixLocation;
 		private readonly int uNumDynamicLightsLocation;
-		private readonly int[] uDynamicLightPositionLocations = new int[8];
-		private readonly int[] uDynamicLightColorLocations = new int[8];
+		private readonly int[] uDynamicLightPositionLocations = new int[32];
+		private readonly int[] uDynamicLightColorLocations = new int[32];
 
 
 		/// <summary>
@@ -107,7 +107,7 @@ namespace LibRender2.Shaders
 			uModelMatrixLocation = GL.GetUniformLocation(Handle, "uModelMatrix");
 			uCurrentViewMatrixLocation = GL.GetUniformLocation(Handle, "uCurrentViewMatrix");
 			uNumDynamicLightsLocation = GL.GetUniformLocation(Handle, "uNumDynamicLights");
-			for (int i = 0; i < 8; i++)
+			for (int i = 0; i < 32; i++)
 			{
 				uDynamicLightPositionLocations[i] = GL.GetUniformLocation(Handle, "uDynamicLights[" + i + "].position");
 				uDynamicLightColorLocations[i] = GL.GetUniformLocation(Handle, "uDynamicLights[" + i + "].color");
@@ -535,13 +535,13 @@ namespace LibRender2.Shaders
 			GL.ProgramUniformMatrix4(Handle, uModelMatrixLocation, false, ref matrix);
 		}
 
-		public void SetDynamicLights(Vector3[] positions, Vector3[] colors, int count)
+		public void SetDynamicLights(Vector3[] positions, Vector3[] colors, float[] ranges, float[] sizes, int count)
 		{
 			GL.ProgramUniform1(Handle, uNumDynamicLightsLocation, count);
 			for (int i = 0; i < count; i++)
 			{
-				GL.ProgramUniform3(Handle, uDynamicLightPositionLocations[i], (float)positions[i].X, (float)positions[i].Y, (float)positions[i].Z);
-				GL.ProgramUniform3(Handle, uDynamicLightColorLocations[i], (float)colors[i].X, (float)colors[i].Y, (float)colors[i].Z);
+				GL.ProgramUniform4(Handle, uDynamicLightPositionLocations[i], (float)positions[i].X, (float)positions[i].Y, (float)positions[i].Z, ranges[i]);
+				GL.ProgramUniform4(Handle, uDynamicLightColorLocations[i], (float)colors[i].X, (float)colors[i].Y, (float)colors[i].Z, sizes[i]);
 			}
 		}
 

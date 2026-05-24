@@ -68,11 +68,11 @@ uniform Light uLight;
 
 struct DynamicLight
 {
-	vec3 position;
-	vec3 color;
+	vec4 position; // xyz = position, w = range
+	vec4 color;    // rgb = color, a = size (MaxFaceDim)
 };
 uniform int uNumDynamicLights;
-uniform DynamicLight uDynamicLights[8];
+uniform DynamicLight uDynamicLights[32];
 
 // Inputs from vertex shader
 in vec3  vNormal;
@@ -268,12 +268,23 @@ void main(void)
 			vec3 normal = normalize(vNormal);
 			for (int i = 0; i < uNumDynamicLights; i++)
 			{
-				vec3 lightDir = uDynamicLights[i].position - oViewPos.xyz;
-				float dist = length(lightDir);
+				vec3 lightDir = uDynamicLights[i].position.xyz - oViewPos.xyz;
+				float lightSize = uDynamicLights[i].color.a;
+				float dist = max(0.0, length(lightDir) - lightSize);
 				lightDir = normalize(lightDir);
 				float diff = max(dot(normal, lightDir), 0.0);
-				float attenuation = 1.0 / (1.0 + 0.05 * dist + 0.02 * dist * dist);
-				dynamicLightContribution += uDynamicLights[i].color * diff * attenuation;
+				float maxRange = uDynamicLights[i].position.w;
+				float attenuation = 0.0;
+				if (dist < maxRange)
+				{
+					float linearCoeff = 1.25 / maxRange;
+					float quadCoeff = 12.5 / (maxRange * maxRange);
+					float baseAtt = 1.0 / (1.0 + linearCoeff * dist + quadCoeff * dist * dist);
+					float ratio = dist / maxRange;
+					float window = 1.0 - ratio * ratio;
+					attenuation = baseAtt * window * window;
+				}
+				dynamicLightContribution += uDynamicLights[i].color.rgb * diff * attenuation;
 			}
 		}
 
